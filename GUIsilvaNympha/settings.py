@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,7 +81,7 @@ DATABASES = {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'silvanympha',
         'USER': 'silvanympha',
-        'PASSWORD': '8JCrRmU2yoR8ARD5DqYS',
+        'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': '172.16.16.52',
         'PORT': '5432',
         'CONN_MAX_AGE': 0,
