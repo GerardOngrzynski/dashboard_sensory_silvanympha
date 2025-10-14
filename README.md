@@ -14,15 +14,50 @@ Eksport do CSV: Możliwość pobrania przefiltrowanych danych dla wybranego sens
 
 
 Użyte Technologie
-Backend
-Python
-Django (+ Django GIS)
-PostgreSQL z rozszerzeniem PostGIS (do obsługi danych przestrzennych)
+Backend:
+Python,
+Django (+ Django GIS),
+PostgreSQL z rozszerzeniem PostGIS (do obsługi danych przestrzennych),
 python-dotenv (do zarządzania zmiennymi środowiskowymi)
 
-Frontend
-HTML5 / CSS3
-JavaScript (ES6+)
-Leaflet.js (do obsługi map)
-Chart.js (do tworzenia wykresów)
+Frontend:
+HTML5 / CSS3,
+JavaScript (ES6+),
+Leaflet.js (do obsługi map),
+Chart.js (do tworzenia wykresów),
 Flatpickr (do wyboru dat)
+
+
+Wymagania systemowe
+Przed instalacją zależności Pythona, upewnij się, że masz zainstalowaną w systemie bibliotekę GDAL. Jest ona niezbędna do obsługi danych geograficznych przez GeoDjango.
+plik settings.py zawiera miejsce na ścieżkę do biblioteki
+
+Windows: przez OSGeo4W.
+macOS: brew install gdal.
+Linux (Ubuntu/Debian): sudo apt-get install gdal-bin libgdal-dev
+
+Instalacja i uruchomienie
+
+git clone <URL>
+cd
+
+
+Stworzenie i aktywacja środowiska wirtualnego:
+# Dla Windows
+python -m venv .venv
+.\.venv\Scripts\activate
+
+# Dla macOS/Linux
+python3 -m venv .venv
+source .venv/bin/activate
+
+
+Instalacja pakietów:
+pip install django psycopg2-binary python-dotenv
+pip freeze > requirements.txt
+
+Utworzenie pliku .env w głównym folderze projektu
+
+Połączenie z baza danych
+
+Uruchomienie: python manage.py runserver
