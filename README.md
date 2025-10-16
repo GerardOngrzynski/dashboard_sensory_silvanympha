@@ -43,11 +43,11 @@ cd
 
 
 Stworzenie i aktywacja środowiska wirtualnego:
-# Dla Windows
+Windows: 
 python -m venv .venv
 .\.venv\Scripts\activate
 
-# Dla macOS/Linux
+MacOS/ Linux: 
 python3 -m venv .venv
 source .venv/bin/activate
 
