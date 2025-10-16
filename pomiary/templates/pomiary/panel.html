@@ -527,7 +527,7 @@
 
                         const datasets = data.datasets.map((ds, i) => ({ ...ds, borderColor: chartColors[i % chartColors.length], backgroundColor: chartColors[i % chartColors.length].replace('1)', '0.1)'), tension: 0.1, borderWidth: 1, pointRadius: 0, pointHoverRadius: 0 }));
                         if (myChart) { myChart.destroy(); }
-                        const chartConfig = { type: 'line', data: { datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { type: 'time', time: { tooltipFormat: 'dd MMM yyyy, HH:mm:ss', displayFormats: { year: 'yyyy', month: 'MMM yyyy', day: 'dd MMM', hour: 'HH:mm' } }, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } }, y: { beginAtZero: false, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } } }, plugins: { legend: { display: true }, tooltip: { enabled: true } } } };
+                        const chartConfig = { type: 'line', data: { datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { type: 'time', time: { tooltipFormat: 'dd MMM yyyy, HH:mm:ss', displayFormats: { year: 'yyyy', month: 'MMM yyyy', day: 'dd MMM', hour: 'HH:mm' } }, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } }, y: { beginAtZero: false, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } } }, plugins: { legend: { display: true }, tooltip: { enabled: false } } } };
                         myChart = new Chart(ctx, chartConfig);
 
                         if (!specificSerialNumber) {
