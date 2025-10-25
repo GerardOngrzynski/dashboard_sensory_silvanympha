@@ -15,6 +15,16 @@
 * **Podgląd danych surowych:** Po wybraniu konkretnego sensora, dane wyświetlane są w formie tabelarycznej.
 * **Eksport do CSV:** Możliwość pobrania przefiltrowanych danych dla wybranego sensora w formacie `.csv`.
 
+
+
+
+
+
+https://github.com/user-attachments/assets/91b250f3-e047-4a1d-9426-021653492e2b
+
+
+
+
 ---
 
 ## Użyte Technologie 💻
