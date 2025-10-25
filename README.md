@@ -97,7 +97,7 @@ https://github.com/user-attachments/assets/91b250f3-e047-4a1d-9426-021653492e2b
     ```
 
 2.  **Połączenie z bazą danych:**
-    > ⚠️ **Krytyczne:** Ten projekt **nie tworzy** bazy danych. Musisz mieć dostęp do **istniejącej bazy PostGIS**, która zawiera już wszystkie tabele i schematy. Modele w `models.py` używają `managed = False`.
+    > ⚠️ Ten projekt **nie tworzy** bazy danych. Musisz mieć dostęp do **istniejącej bazy PostGIS**, która zawiera już wszystkie tabele i schematy. Modele w `models.py` używają `managed = False`.
     
     Upewnij się, że dane w `settings.py` (HOST, PORT, NAME, USER)  wskazują na BD.
 
