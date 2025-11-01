@@ -15,7 +15,7 @@
 * **Podgląd danych surowych:** Po wybraniu konkretnego sensora, dane wyświetlane są w formie tabelarycznej.
 * **Eksport do CSV:** Możliwość pobrania przefiltrowanych danych dla wybranego sensora w formacie `.csv`.
 
-
+https://silva-nympha.taxusit.pl/sensors/
 
 
 
