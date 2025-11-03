@@ -308,6 +308,28 @@
             border-color: #999;
         }
 
+        #platform-link-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 8px;
+            background-color: white;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: sans-serif;
+            text-decoration: none;
+            color: #333;
+            font-size: 1em;
+        }
+
+        #platform-link-btn:hover {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+
         #download-csv-btn {
             position: absolute;
             bottom: 15px;
@@ -416,6 +438,7 @@
                 <div class="data-container map-wrapper" style="padding: 0;">
                     <div id="map"></div>
                     <button id="fullscreen-btn">⛶ Expand</button>
+                    <a href="https://silva-nympha.taxusit.pl/app/" target="_blank" id="platform-link-btn">Go to data platform</a>
                 </div>
             </div>
             <div class="charts-area">

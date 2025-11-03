@@ -109,8 +109,8 @@ def get_chart_data(request):
     if serial_number:
         query = query.filter(sensor_serial_num__serial_number=serial_number)
 
-    DATA_LIMIT = 100000
-    sensor_data = query[:DATA_LIMIT]
+    #DATA_LIMIT = 100000
+    sensor_data = query#[:DATA_LIMIT]
 
     used_sensors_info = {}
 
