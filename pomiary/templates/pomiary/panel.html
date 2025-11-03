@@ -364,7 +364,7 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                <h2 style="margin: 0;">Filters:</h2>
+                <h2 style="margin: 0;">Sample plots:</h2>
                 <form id="schema-form" method="GET" action="">
                     <select name="schema" id="schema-select" class="filter-form" style="margin:0; padding: 5px; width: auto; border-radius: 5px; border: none;">
                         {% for schema in available_schemas %}
@@ -397,7 +397,8 @@
                     <input type="date" id="start_date" name="start_date" value="{{ start_date_val }}" required>
                     <label for="end_date">Date to:</label>
                     <input type="date" id="end_date" name="end_date" value="{{ end_date_val }}" required>
-                    <button type="button" id="generate-chart-btn">Get data</button>
+
+                    <button type="button" id="generate-chart-btn">Display data</button>
                 </form>
                 <div id="used-sensors-container"></div>
             </div>
@@ -408,7 +409,7 @@
                 <div class="data-container" id="details-container">
                     <h3>Details</h3>
                     <div class="table-wrapper" id="details-table-wrapper">
-                        <p style="color: #888; text-align: center; margin-top: 20px;">Click "Select" on a sensor to display its data.</p>
+                        <p style="color: #888; text-align: center; margin-top: 20px;">Choose a sample plot, a sensor parameter, a range of dates, and click "Display data".</p>
                     </div>
                     <a href="#" id="download-csv-btn" download>Download as CSV</a>
                 </div>
@@ -418,7 +419,10 @@
                 </div>
             </div>
             <div class="charts-area">
-                <h2 id="chart-title">Charts</h2>
+                <h2>
+                    <span id="chart-title">Charts</span>
+                    <button id="show-all-btn" style="display: none; font-size: 0.7em; vertical-align: middle; margin-left: 10px;">Show all</button>
+                </h2>
                 <div class="chart-controls"></div>
                 <div class="chart-container">
                     <div id="chart-placeholder">
@@ -439,7 +443,8 @@
             let myChart;
             let sensorLayerGroup = L.layerGroup();
             const selectedSchema = "{{ selected_schema }}";
-
+            let allChartDatasets = [];
+            let activeSensorSerials = [];
             const schemaBoundsData = JSON.parse(document.getElementById('schema-bounds-data').textContent);
 
             const currentBounds = L.latLngBounds(
@@ -456,8 +461,28 @@
                 zoomSnap: 0.25
             });
 
-            flatpickr("#start_date", { dateFormat: "Y-m-d", locale: "default", minDate: "2023-01-01" });
-            flatpickr("#end_date", { dateFormat: "Y-m-d", locale: "default", minDate: "2023-01-01" });
+            const startDatePicker = flatpickr("#start_date", {
+                dateFormat: "Y-m-d",
+                locale: "default",
+                minDate: "2023-01-01",
+                onChange: function(selectedDates, dateStr, instance) {
+                    const endDate = endDatePicker.selectedDates[0];
+                    if (endDate && selectedDates[0] > endDate) {
+                        endDatePicker.clear();
+                    }
+                }
+            });
+            const endDatePicker = flatpickr("#end_date", {
+                dateFormat: "Y-m-d",
+                locale: "default",
+                minDate: "2023-01-01",
+                onChange: function(selectedDates, dateStr, instance) {
+                    const startDate = startDatePicker.selectedDates[0];
+                    if (startDate && selectedDates[0] < startDate) {
+                        startDatePicker.clear();
+                    }
+                }
+            });
 
             const schemaSelect = document.getElementById('schema-select');
             schemaSelect.addEventListener('change', function() {
@@ -489,6 +514,65 @@
                 });
             }
 
+            function getChartConfig(datasets) {
+                return {
+                    type: 'line',
+                    data: { datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    tooltipFormat: 'dd MMM yyyy, HH:mm:ss',
+                                    displayFormats: {
+                                        millisecond: 'HH:mm:ss.SSS',
+                                        second: 'HH:mm:ss',
+                                        minute: 'HH:mm',
+                                        hour: 'dd MMM HH:mm',
+                                        day: 'dd MMM',
+                                        week: 'dd MMM yyyy',
+                                        month: 'MMM yyyy',
+                                        quarter: 'MMM yyyy',
+                                        year: 'yyyy'
+                                    }
+                                },
+                                ticks: { color: 'black' },
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                            },
+                            y: {
+                                beginAtZero: false,
+                                ticks: { color: 'black' },
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: true },
+                            tooltip: {
+                                enabled: false
+                            }
+                        }
+                    }
+                };
+            }
+
+            function renderChart(sensorSerial = null) {
+                const ctx = document.getElementById('myChart').getContext('2d');
+                let datasetsToShow = [];
+
+                if (sensorSerial) {
+                    datasetsToShow = allChartDatasets.filter(ds => ds.sensor_serial === sensorSerial);
+                } else {
+                    datasetsToShow = allChartDatasets.filter(ds => activeSensorSerials.includes(ds.sensor_serial));
+                }
+
+                if (myChart) { myChart.destroy(); }
+                const chartConfig = getChartConfig(datasetsToShow);
+                myChart = new Chart(ctx, chartConfig);
+            }
+
             function initChartAndSensors() {
                 const generateChartBtn = document.getElementById('generate-chart-btn');
                 const sensorsContainer = document.getElementById('used-sensors-container');
@@ -498,7 +582,14 @@
                 const ctx = chartCanvas.getContext('2d');
                 const chartColors = ['rgba(54, 162, 235, 1)','rgba(255, 99, 132, 1)','rgba(255, 206, 86, 1)','rgba(75, 192, 192, 1)','rgba(153, 102, 255, 1)','rgba(255, 159, 64, 1)'];
 
-                async function updateChart(specificSerialNumber = null) {
+                async function updateChart() {
+                    const tableWrapper = document.getElementById('details-table-wrapper');
+                    tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Loading data...</p>';
+                    document.getElementById('details-container').querySelector('h3').textContent = 'Details';
+                    document.getElementById('download-csv-btn').style.display = 'none';
+                    chartTitle.textContent = 'Charts';
+                    document.getElementById('show-all-btn').style.display = 'none';
+
                     const button = document.getElementById('generate-chart-btn');
                     const originalButtonText = button.innerHTML;
                     button.innerHTML = 'Loading...'; button.disabled = true;
@@ -507,33 +598,47 @@
                         const startDate = document.getElementById('start_date').value;
                         const endDate = document.getElementById('end_date').value;
                         if (selectedParams.length === 0 || !startDate || !endDate) {
-                            alert('Select at least one parameter and date range'); return;
+                            alert('Select at least one parameter and date range');
+                            tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Choose a sample plot, a sensor parameter, a range of dates, and click "Display data".</p>';
+                            return;
                         }
                         const params = new URLSearchParams();
                         selectedParams.forEach(p => params.append('sensor_params[]', p));
                         params.append('start_date', startDate);
                         params.append('end_date', endDate);
-                        if (specificSerialNumber) {
-                            params.append('serial_number', specificSerialNumber);
-                        }
                         params.append('schema', selectedSchema);
 
                         const response = await fetch(`/get-chart-data/?${params.toString()}`);
                         const data = await response.json();
                         if (data.error || !response.ok) { alert(`Error: ${data.error || 'Could not download data'}`); return; }
+                        const noSensors = !data.used_sensors || data.used_sensors.length === 0;
+                        const noDataInDatasets = !data.datasets || data.datasets.length === 0;
+
+                        if (noSensors || noDataInDatasets) {
+                            tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">No data avaiable, change the sensor paramter or the range of dates.</p>';
+                            chartPlaceholder.style.display = 'flex';
+                            chartCanvas.style.display = 'none';
+                            if (myChart) { myChart.destroy(); }
+                            sensorsContainer.innerHTML = '';
+                            sensorLayerGroup.clearLayers();
+                            allChartDatasets = [];
+                            activeSensorSerials = [];
+                            return;
+                        }
 
                         chartPlaceholder.style.display = 'none';
                         chartCanvas.style.display = 'block';
 
-                        const datasets = data.datasets.map((ds, i) => ({ ...ds, borderColor: chartColors[i % chartColors.length], backgroundColor: chartColors[i % chartColors.length].replace('1)', '0.1)'), tension: 0.1, borderWidth: 1, pointRadius: 0, pointHoverRadius: 0 }));
-                        if (myChart) { myChart.destroy(); }
-                        const chartConfig = { type: 'line', data: { datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { type: 'time', time: { tooltipFormat: 'dd MMM yyyy, HH:mm:ss', displayFormats: { year: 'yyyy', month: 'MMM yyyy', day: 'dd MMM', hour: 'HH:mm' } }, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } }, y: { beginAtZero: false, ticks: { color: 'black' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } } }, plugins: { legend: { display: true }, tooltip: { enabled: false } } } };
-                        myChart = new Chart(ctx, chartConfig);
+                        allChartDatasets = data.datasets.map((ds, i) => ({ ...ds, borderColor: chartColors[i % chartColors.length], backgroundColor: chartColors[i % chartColors.length].replace('1)', '0.1)'), tension: 0.1, borderWidth: 1, pointRadius: 0, pointHoverRadius: 0 }));
+                        activeSensorSerials = (data.used_sensors || []).map(s => s.serial_number);
 
-                        if (!specificSerialNumber) {
-                            displayUsedSensors(data.used_sensors || []);
-                            plotAllSensorsOnMap(data.used_sensors || []);
-                        }
+                        renderChart();
+                        displayUsedSensors(data.used_sensors || []);
+                        plotAllSensorsOnMap(data.used_sensors || []);
+
+
+                        tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Click „Select” on a sensor or choose a sensor from the map to display its data.</p>';
+
                     } catch (error) {
                         chartPlaceholder.style.display = 'flex';
                         chartCanvas.style.display = 'none';
@@ -557,8 +662,9 @@
                         if (!foundMarker) alert('Sensor marker not found on map.');
                     } else { alert('No location data for this sensor.'); }
 
-                    await updateChart(serial);
+                    renderChart(serial);
                     chartTitle.textContent = `Chart: ${name}`;
+                    document.getElementById('show-all-btn').style.display = 'inline-block';
 
                     const startDate = document.getElementById('start_date').value;
                     const endDate = document.getElementById('end_date').value;
@@ -612,11 +718,10 @@
 
                 generateChartBtn.addEventListener('click', () => {
                     updateChart();
-                    chartTitle.textContent = 'Charts';
                 });
 
                 function displayUsedSensors(sensors) {
-                    sensorsContainer.innerHTML = sensors.length > 0 ? '<h4>Used Sensors:</h4>' : '';
+                    sensorsContainer.innerHTML = sensors.length > 0 ? '<h4>Sensors displayed:</h4>' : '';
                     sensors.forEach(sensor => {
                         const sensorItem = document.createElement('div');
                         sensorItem.className = 'sensor-item';
@@ -631,12 +736,33 @@
                         const { serial, name } = target.dataset;
                         target.closest('.sensor-item').remove();
                         sensorLayerGroup.eachLayer(function(marker) { if (marker.options.serialNumber === serial) { marker.remove(); } });
-                        if (chartTitle.textContent === `Chart: ${name}`) { updateChart(); chartTitle.textContent = 'Charts'; }
-                        if (document.getElementById('details-container').querySelector('h3').textContent.includes(name)) { document.getElementById('details-table-wrapper').innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Click "Select" on a sensor to display its data.</p>'; document.getElementById('details-container').querySelector('h3').textContent = 'Details'; document.getElementById('download-csv-btn').style.display = 'none'; }
+
+                        activeSensorSerials = activeSensorSerials.filter(s => s !== serial);
+                        renderChart();
+
+                        if (chartTitle.textContent === `Chart: ${name}`) {
+                            chartTitle.textContent = 'Charts';
+                            document.getElementById('show-all-btn').style.display = 'none';
+                            const tableWrapper = document.getElementById('details-table-wrapper');
+                            tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Click „Select” on a sensor or choose a sensor from the map to display its data.</p>';
+                            document.getElementById('details-container').querySelector('h3').textContent = 'Details';
+                            document.getElementById('download-csv-btn').style.display = 'none';
+                        }
                     } else if (target.classList.contains('select-sensor-btn')) {
                         const { serial, model, name, lat, lon } = target.dataset;
                         selectSensor(serial, model, name, lat, lon);
                     }
+                });
+
+                document.getElementById('show-all-btn').addEventListener('click', function() {
+                    renderChart();
+                    chartTitle.textContent = 'Charts';
+                    this.style.display = 'none';
+
+                    const tableWrapper = document.getElementById('details-table-wrapper');
+                    tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Click „Select” on a sensor or choose a sensor from the map to display its data.</p>';
+                    document.getElementById('details-container').querySelector('h3').textContent = 'Details';
+                    document.getElementById('download-csv-btn').style.display = 'none';
                 });
             }
 
