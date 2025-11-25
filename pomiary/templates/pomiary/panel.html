@@ -104,6 +104,8 @@
             margin: 0 0 15px 0;
             font-size: 1.5em;
             color: black;
+            display: flex;
+            align-items: center;
         }
 
         .chart-container {
@@ -330,6 +332,26 @@
             border-color: #999;
         }
 
+        #show-all-btn {
+            padding: 6px 12px;
+            background-color: white;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+
+            display: none;
+            margin-left: 15px;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        #show-all-btn:hover {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+
         #download-csv-btn {
             position: absolute;
             bottom: 15px;
@@ -444,7 +466,7 @@
             <div class="charts-area">
                 <h2>
                     <span id="chart-title">Charts</span>
-                    <button id="show-all-btn" style="display: none; font-size: 0.7em; vertical-align: middle; margin-left: 10px;">Show all</button>
+                    <button id="show-all-btn">Show all</button>
                 </h2>
                 <div class="chart-controls"></div>
                 <div class="chart-container">
