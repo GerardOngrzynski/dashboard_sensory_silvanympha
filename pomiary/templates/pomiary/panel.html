@@ -629,38 +629,59 @@
 
                 async function updateChart() {
                     const tableWrapper = document.getElementById('details-table-wrapper');
+
                     tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Loading data...</p>';
                     document.getElementById('details-container').querySelector('h3').textContent = 'Details';
                     document.getElementById('download-csv-btn').style.display = 'none';
+
+                    const chartTitle = document.getElementById('chart-title');
+                    const chartPlaceholder = document.getElementById('chart-placeholder');
+                    const chartCanvas = document.getElementById('myChart');
+                    const sensorsContainer = document.getElementById('used-sensors-container');
+
                     chartTitle.textContent = 'Charts';
                     document.getElementById('show-all-btn').style.display = 'none';
 
                     const button = document.getElementById('generate-chart-btn');
                     const originalButtonText = button.innerHTML;
-                    button.innerHTML = 'Loading...'; button.disabled = true;
+                    button.innerHTML = 'Loading...';
+                    button.disabled = true;
+
                     try {
-                        const selectedParams = Array.from(document.querySelectorAll('#chart-params-container select')).map(s => s.value).filter(v => v);
+                        const selectedParams = Array.from(document.querySelectorAll('#chart-params-container select'))
+                            .map(s => s.value)
+                            .filter(v => v);
                         const startDate = document.getElementById('start_date').value;
                         const endDate = document.getElementById('end_date').value;
+
                         if (selectedParams.length === 0 || !startDate || !endDate) {
                             alert('Select at least one parameter and date range');
                             tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Choose a sample plot, a sensor parameter, a range of dates, and click "Display data".</p>';
                             return;
                         }
+
+                        const chartContainer = document.querySelector('.chart-container');
+                        const pixelWidth = chartContainer ? Math.floor(chartContainer.clientWidth) : 1000;
                         const params = new URLSearchParams();
                         selectedParams.forEach(p => params.append('sensor_params[]', p));
                         params.append('start_date', startDate);
                         params.append('end_date', endDate);
                         params.append('schema', selectedSchema);
+                        params.append('width', pixelWidth);
 
                         const response = await fetch(`/get-chart-data/?${params.toString()}`);
                         const data = await response.json();
-                        if (data.error || !response.ok) { alert(`Error: ${data.error || 'Could not download data'}`); return; }
+
+                        if (data.error || !response.ok) {
+                            alert(`Error: ${data.error || 'Could not download data'}`);
+                            return;
+                        }
+
                         const noSensors = !data.used_sensors || data.used_sensors.length === 0;
                         const noDataInDatasets = !data.datasets || data.datasets.length === 0;
 
                         if (noSensors || noDataInDatasets) {
-                            tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">No data avaiable, change the sensor paramter or the range of dates.</p>';
+                            tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">No data available, change the sensor parameter or the range of dates.</p>';
                             chartPlaceholder.style.display = 'flex';
                             chartCanvas.style.display = 'none';
                             if (myChart) { myChart.destroy(); }
@@ -674,13 +695,21 @@
                         chartPlaceholder.style.display = 'none';
                         chartCanvas.style.display = 'block';
 
-                        allChartDatasets = data.datasets.map((ds, i) => ({ ...ds, borderColor: chartColors[i % chartColors.length], backgroundColor: chartColors[i % chartColors.length].replace('1)', '0.1)'), tension: 0.1, borderWidth: 1, pointRadius: 0, pointHoverRadius: 0 }));
+                        allChartDatasets = data.datasets.map((ds, i) => ({
+                            ...ds,
+                            borderColor: chartColors[i % chartColors.length],
+                            backgroundColor: chartColors[i % chartColors.length].replace('1)', '0.1)'),
+                            tension: 0.1,
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }));
+
                         activeSensorSerials = (data.used_sensors || []).map(s => s.serial_number);
 
                         renderChart();
                         displayUsedSensors(data.used_sensors || []);
                         plotAllSensorsOnMap(data.used_sensors || []);
-
 
                         tableWrapper.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">Click „Select” on a sensor or choose a sensor from the map to display its data.</p>';
 
@@ -690,7 +719,8 @@
                         console.error("Error generating chart:", error);
                         alert('An unexpected error occurred. Check the dev console.');
                     } finally {
-                        button.innerHTML = originalButtonText; button.disabled = false;
+                        button.innerHTML = originalButtonText;
+                        button.disabled = false;
                     }
                 }
 

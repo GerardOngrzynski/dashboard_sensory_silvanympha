@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timedelta
 import csv
 from .middleware import SchemaMiddleware
+from django.db import connection
 
 
 class CastToNumeric(Transform):
@@ -95,61 +96,146 @@ def get_chart_data(request):
     end_date_str = request.GET.get('end_date')
     serial_number = request.GET.get('serial_number', None)
 
+    try:
+        pixel_width = int(request.GET.get('width', 1000))
+    except (ValueError, TypeError):
+        pixel_width = 1000
+
     if not all([param_codes, start_date_str, end_date_str]):
         return JsonResponse({'error': 'Missing parameters'}, status=400)
 
-    start_date = datetime.fromisoformat(start_date_str)
-    end_date = datetime.fromisoformat(end_date_str)
+    start_date = parse_datetime(start_date_str) if 'T' in start_date_str else datetime.fromisoformat(start_date_str)
+    end_date = parse_datetime(end_date_str) if 'T' in end_date_str else datetime.fromisoformat(end_date_str)
 
-    query = SensorData.objects.filter(
-        param__parameter_cd__in=param_codes,
-        time_stamp__range=(start_date, end_date)
-    ).order_by('time_stamp').select_related('param', 'sensor_serial_num', 'sensor_serial_num__hardware')
-
-    if serial_number:
-        query = query.filter(sensor_serial_num__serial_number=serial_number)
-
-    #DATA_LIMIT = 100000
-    sensor_data = query#[:DATA_LIMIT]
+    start_ts = start_date.timestamp()
+    end_ts = end_date.timestamp()
 
     used_sensors_info = {}
-
-    grouped_data = {}
-
-    for item in sensor_data:
-        if not item.sensor_serial_num or not item.param:
-            continue
-
-        sensor_serial = item.sensor_serial_num.serial_number
-        param_code = item.param.parameter_cd
-        key = (param_code, sensor_serial)
-
-        if key not in grouped_data:
-            grouped_data[key] = []
-        grouped_data[key].append({'x': item.time_stamp.isoformat(), 'y': item.data})
-
-        sensor = item.sensor_serial_num
-        if sensor and sensor.hardware and sensor.serial_number not in used_sensors_info:
-            lat_str = sensor.latitude.replace(',', '.') if sensor.latitude else None
-            lon_str = sensor.longitude.replace(',', '.') if sensor.longitude else None
-            used_sensors_info[sensor.serial_number] = {'model': sensor.hardware.model,
-                                                       'description': sensor.hardware.description, 'lat': lat_str,
-                                                       'lon': lon_str, 'serial_number': sensor.serial_number,
-                                                       'name': sensor.name}
-
     datasets = []
+
     param_infos = {p.parameter_cd: p for p in SensorParamDic.objects.filter(parameter_cd__in=param_codes)}
+
+    base_query = SensorData.objects.filter(
+        param__parameter_cd__in=param_codes,
+        time_stamp__range=(start_date, end_date)
+    )
+    if serial_number:
+        base_query = base_query.filter(sensor_serial_num__serial_number=serial_number)
+
+    total_count = base_query.count()
+    m4_threshold = pixel_width * 4
+
+    if total_count <= m4_threshold:
+        sensor_data = base_query.order_by('time_stamp').select_related('param', 'sensor_serial_num',
+                                                                       'sensor_serial_num__hardware')
+
+        grouped_data = {}
+        for item in sensor_data:
+            s_serial = item.sensor_serial_num.serial_number
+            p_code = item.param.parameter_cd
+            key = (p_code, s_serial)
+
+            if key not in grouped_data: grouped_data[key] = []
+            grouped_data[key].append({'x': item.time_stamp.isoformat(), 'y': item.data})
+
+            if s_serial not in used_sensors_info:
+                sensor = item.sensor_serial_num
+                lat = sensor.latitude.replace(',', '.') if sensor.latitude else None
+                lon = sensor.longitude.replace(',', '.') if sensor.longitude else None
+                used_sensors_info[s_serial] = {
+                    'model': sensor.hardware.model if sensor.hardware else '',
+                    'description': sensor.hardware.description if sensor.hardware else '',
+                    'lat': lat, 'lon': lon, 'serial_number': s_serial, 'name': sensor.name
+                }
+    else:
+        params_placeholder = ','.join(['%s'] * len(param_codes))
+
+        sql = f"""
+        WITH filtered_data AS (
+            SELECT 
+                sd.id,
+                sd.time_stamp,
+                sd.data,
+                sd.sensor_serial_num,
+                sd.param,
+                width_bucket(EXTRACT(EPOCH FROM sd.time_stamp), %s, %s, %s) as bucket
+            FROM sensor_data sd
+            WHERE sd.time_stamp >= %s AND sd.time_stamp <= %s
+            AND sd.param IN ({params_placeholder})
+            {'AND sd.sensor_serial_num = %s' if serial_number else ''}
+        ),
+        bucket_stats AS (
+            SELECT 
+                bucket,
+                sensor_serial_num,
+                param,
+                min(data) as min_v,
+                max(data) as max_v,
+                min(time_stamp) as min_t,
+                max(time_stamp) as max_t
+            FROM filtered_data
+            GROUP BY bucket, sensor_serial_num, param
+        )
+        SELECT DISTINCT ON (fd.time_stamp, fd.sensor_serial_num, fd.param)
+            fd.time_stamp,
+            fd.data,
+            fd.sensor_serial_num,
+            fd.param
+        FROM filtered_data fd
+        JOIN bucket_stats bs ON fd.bucket = bs.bucket 
+            AND fd.sensor_serial_num = bs.sensor_serial_num 
+            AND fd.param = bs.param
+        WHERE 
+            fd.data = bs.min_v OR 
+            fd.data = bs.max_v OR 
+            fd.time_stamp = bs.min_t OR 
+            fd.time_stamp = bs.max_t
+        ORDER BY fd.sensor_serial_num, fd.param, fd.time_stamp
+        """
+
+        query_params = [start_ts, end_ts, pixel_width, start_date, end_date] + param_codes
+        if serial_number:
+            query_params.append(serial_number)
+
+        grouped_data = {}
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql, query_params)
+            rows = cursor.fetchall()
+
+            for row in rows:
+                ts, val, s_serial, p_code = row
+                key = (p_code, s_serial)
+                if key not in grouped_data: grouped_data[key] = []
+                grouped_data[key].append({'x': ts.isoformat(), 'y': val})
+
+                if s_serial not in used_sensors_info:
+                    try:
+                        sensor = SensorSensors.objects.select_related('hardware').get(serial_number=s_serial)
+                        lat = sensor.latitude.replace(',', '.') if sensor.latitude else None
+                        lon = sensor.longitude.replace(',', '.') if sensor.longitude else None
+                        used_sensors_info[s_serial] = {
+                            'model': sensor.hardware.model if sensor.hardware else '',
+                            'description': sensor.hardware.description if sensor.hardware else '',
+                            'lat': lat, 'lon': lon, 'serial_number': s_serial, 'name': sensor.name
+                        }
+                    except SensorSensors.DoesNotExist:
+                        continue
 
     for (param_code, sensor_serial), data_points in grouped_data.items():
         param_info = param_infos.get(param_code)
         sensor_info = used_sensors_info.get(sensor_serial)
 
-        if param_info and sensor_info:
-            dataset_label = f"{sensor_info['name']}: {param_info.parameter_description} ({param_info.unit})"
-        elif param_info:
-            dataset_label = f"{sensor_serial}: {param_info.parameter_description} ({param_info.unit})"
-        else:
-            dataset_label = f"{sensor_serial}: {param_code}"
+        label_part = sensor_serial
+        if sensor_info: label_part = sensor_info['name']
+
+        desc_part = param_code
+        unit_part = ""
+        if param_info:
+            desc_part = param_info.parameter_description
+            unit_part = f" ({param_info.unit})"
+
+        dataset_label = f"{label_part}: {desc_part}{unit_part}"
 
         datasets.append({
             'label': dataset_label,
