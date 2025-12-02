@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import csv
 from .middleware import SchemaMiddleware
 from django.db import connection
+#from .models import SiatkaUtm, GAoi
+#from django.contrib.gis.geos import Polygon, MultiPolygon
 
 
 class CastToNumeric(Transform):
